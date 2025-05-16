@@ -28,8 +28,7 @@ interface FrameworkTableProps {
 interface AssetOption {
   id: string;
   displayName: string;
-  level: 'assetType' | 'assetClass' | 'assetSubclass';
-  assetTypeId?: string;
+  level: 'assetClass' | 'assetSubclass';
   assetClassId?: string;
   assetSubclassId?: string;
 }
@@ -68,41 +67,15 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
     setAssetSubclasses(allSubclasses);
   }, [controlGroups, assetClasses]);
 
-  // Generate asset options for each safeguard with asset types, classes, and subclasses
+  // Generate asset options for each safeguard with classes and subclasses (no types)
   useEffect(() => {
     const options: Record<string, AssetOption[]> = {};
 
     safeguards.forEach(safeguard => {
       const safeguardOptions: AssetOption[] = [];
       
-      // Group applicable asset classes by type
-      const assetTypeMap: Record<string, string[]> = {};
-      const applicableClassIds = safeguard.applicable_asset_classes;
-      
-      applicableClassIds.forEach(classId => {
-        const assetClass = assetClasses.find(ac => ac.id === classId);
-        if (assetClass) {
-          if (!assetTypeMap[assetClass.id]) {
-            assetTypeMap[assetClass.id] = [];
-          }
-          assetTypeMap[assetClass.id].push(assetClass.id);
-        }
-      });
-      
-      // Add asset types as options
-      Object.keys(assetTypeMap).forEach(typeId => {
-        const assetClass = assetClasses.find(ac => ac.id === typeId);
-        if (assetClass) {
-          safeguardOptions.push({
-            id: `type-${assetClass.id}`,
-            displayName: `${assetClass.name} (All)`,
-            level: 'assetType',
-            assetTypeId: assetClass.id
-          });
-        }
-      });
-      
       // Add asset classes as options
+      const applicableClassIds = safeguard.applicable_asset_classes;
       applicableClassIds.forEach(classId => {
         const assetClass = assetClasses.find(ac => ac.id === classId);
         if (assetClass) {
@@ -110,7 +83,6 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
             id: `class-${classId}`,
             displayName: `${assetClass.name}`,
             level: 'assetClass',
-            assetTypeId: assetClass.id,
             assetClassId: classId
           });
         }
@@ -125,7 +97,6 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
                 id: `subclass-${assetClass.id}-${subclass.id}`,
                 displayName: `${assetClass.name} > ${subclass.name}`,
                 level: 'assetSubclass',
-                assetTypeId: assetClass.id,
                 assetClassId: assetClass.id,
                 assetSubclassId: subclass.id
               });
@@ -204,10 +175,7 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
     let assetClassId = '';
     let assetSubclassId = '';
     
-    if (level === 'type') {
-      // User selected an asset type - set classId but leave subclassId empty
-      assetClassId = parts[1];
-    } else if (level === 'class') {
+    if (level === 'class') {
       // User selected an asset class - set classId but leave subclassId empty
       assetClassId = parts[1];
     } else if (level === 'subclass') {
@@ -347,7 +315,7 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
                 </Select>
               </TableCell>
               
-              {/* Combined Asset Type/Class/Subclass */}
+              {/* Combined Asset Class/Subclass */}
               <TableCell>
                 <Select
                   value={row.assetClassId && row.assetSubclassId 
