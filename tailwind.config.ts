@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,13 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Security-themed colors
+				security: {
+					low: '#4ade80',    // Green for low risk/good metrics
+					medium: '#facc15', // Yellow for medium risk/neutral metrics
+					high: '#f87171',   // Red for high risk/poor metrics
+					blue: '#60a5fa',   // Blue for information/neutral
 				}
 			},
 			borderRadius: {
