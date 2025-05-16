@@ -2,9 +2,6 @@
 import { Attribute, FrameworkRow, AssessmentRow, AssetClass, AssetSubclass, Control, ControlGroup, TabType } from "@/types/security-types";
 import { saveAs } from 'file-saver';
 
-// Install file-saver
-// <lov-add-dependency>file-saver@^2.0.5</lov-add-dependency>
-
 interface ExportData {
   tabType: TabType;
   rows: FrameworkRow[] | AssessmentRow[];
@@ -126,8 +123,8 @@ async function exportAsSpreadsheet(
   assetClasses: AssetClass[]
 ) {
   try {
-    // Dynamically import the XLSX library
-    const XLSX = await import('xlsx').then(module => module.default);
+    // Import the XLSX library
+    const XLSX = await import('xlsx');
     
     // Prepare data
     const data = prepareTabularData(rows, attributes, controlGroups, assetClasses);
@@ -158,9 +155,11 @@ async function exportAsPdf(
   assetClasses: AssetClass[]
 ) {
   try {
-    // Dynamically import the jspdf and jspdf-autotable libraries
-    const jsPDF = await import('jspdf').then(module => module.default);
-    const autoTable = await import('jspdf-autotable').then(module => module.default);
+    // Import jspdf and jspdf-autotable libraries
+    const jsPDFModule = await import('jspdf');
+    const jsPDF = jsPDFModule.default;
+    const autoTableModule = await import('jspdf-autotable');
+    const autoTable = autoTableModule.default;
     
     // Prepare data
     const data = prepareTabularData(rows, attributes, controlGroups, assetClasses);
@@ -220,8 +219,9 @@ async function exportAsSlide(
   assetClasses: AssetClass[]
 ) {
   try {
-    // Dynamically import the pptxgenjs library
-    const PptxGenJS = await import('pptxgenjs').then(module => module.default);
+    // Import the pptxgenjs library
+    const pptxgenModule = await import('pptxgenjs');
+    const PptxGenJS = pptxgenModule.default;
     
     // Prepare data
     const data = prepareTabularData(rows, attributes, controlGroups, assetClasses);
@@ -285,14 +285,15 @@ async function exportAsSlide(
         align: 'right'
       });
       
-      // Add table
+      // Add table - fix columnWidths issue by using proper options
       tableSlide.addTable(slideRows, {
         x: 0.5,
         y: 1.0,
         w: 9.0,
         fontSize: 10,
         autoPage: false,
-        columnWidths: [0.8, 2.0, 0.8, 2.0, 1.0, 1.2, 1.2] // Adjust as needed
+        // Use colW instead of columnWidths for pptxgenjs
+        colW: [0.8, 2.0, 0.8, 2.0, 1.0, 1.2, 1.2] // Adjust as needed
       });
     }
     
@@ -303,3 +304,4 @@ async function exportAsSlide(
     alert('Failed to export as slide. See console for details.');
   }
 }
+
