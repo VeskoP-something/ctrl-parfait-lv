@@ -28,8 +28,10 @@ interface FrameworkTableProps {
 interface AssetOption {
   id: string;
   displayName: string;
-  assetClassId: string;
-  assetSubclassId: string;
+  level: 'assetType' | 'assetClass' | 'assetSubclass';
+  assetTypeId?: string;
+  assetClassId?: string;
+  assetSubclassId?: string;
 }
 
 const FrameworkTable: React.FC<FrameworkTableProps> = ({
@@ -66,21 +68,64 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
     setAssetSubclasses(allSubclasses);
   }, [controlGroups, assetClasses]);
 
-  // Generate asset options for each safeguard
+  // Generate asset options for each safeguard with asset types, classes, and subclasses
   useEffect(() => {
     const options: Record<string, AssetOption[]> = {};
 
     safeguards.forEach(safeguard => {
       const safeguardOptions: AssetOption[] = [];
       
-      // Add all applicable asset class + subclass combinations
+      // Group applicable asset classes by type
+      const assetTypeMap: Record<string, string[]> = {};
+      const applicableClassIds = safeguard.applicable_asset_classes;
+      
+      applicableClassIds.forEach(classId => {
+        const assetClass = assetClasses.find(ac => ac.id === classId);
+        if (assetClass) {
+          if (!assetTypeMap[assetClass.id]) {
+            assetTypeMap[assetClass.id] = [];
+          }
+          assetTypeMap[assetClass.id].push(assetClass.id);
+        }
+      });
+      
+      // Add asset types as options
+      Object.keys(assetTypeMap).forEach(typeId => {
+        const assetClass = assetClasses.find(ac => ac.id === typeId);
+        if (assetClass) {
+          safeguardOptions.push({
+            id: `type-${assetClass.id}`,
+            displayName: `${assetClass.name} (All)`,
+            level: 'assetType',
+            assetTypeId: assetClass.id
+          });
+        }
+      });
+      
+      // Add asset classes as options
+      applicableClassIds.forEach(classId => {
+        const assetClass = assetClasses.find(ac => ac.id === classId);
+        if (assetClass) {
+          safeguardOptions.push({
+            id: `class-${classId}`,
+            displayName: `${assetClass.name}`,
+            level: 'assetClass',
+            assetTypeId: assetClass.id,
+            assetClassId: classId
+          });
+        }
+      });
+      
+      // Add specific asset class + subclass combinations
       assetClasses.forEach(assetClass => {
         if (safeguard.applicable_asset_classes.includes(assetClass.id)) {
           assetClass.subclasses.forEach(subclass => {
             if (safeguard.applicable_asset_subclasses.includes(subclass.id)) {
               safeguardOptions.push({
-                id: `${assetClass.id}-${subclass.id}`,
+                id: `subclass-${assetClass.id}-${subclass.id}`,
                 displayName: `${assetClass.name} > ${subclass.name}`,
+                level: 'assetSubclass',
+                assetTypeId: assetClass.id,
                 assetClassId: assetClass.id,
                 assetSubclassId: subclass.id
               });
@@ -153,7 +198,23 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
     
     if (rowIndex === -1 || !combinedValue) return;
     
-    const [assetClassId, assetSubclassId] = combinedValue.split('-');
+    const parts = combinedValue.split('-');
+    const level = parts[0];
+    
+    let assetClassId = '';
+    let assetSubclassId = '';
+    
+    if (level === 'type') {
+      // User selected an asset type - set classId but leave subclassId empty
+      assetClassId = parts[1];
+    } else if (level === 'class') {
+      // User selected an asset class - set classId but leave subclassId empty
+      assetClassId = parts[1];
+    } else if (level === 'subclass') {
+      // User selected a specific subclass - set both classId and subclassId
+      assetClassId = parts[1];
+      assetSubclassId = parts[2];
+    }
     
     updatedRows[rowIndex] = {
       ...updatedRows[rowIndex],
@@ -286,10 +347,14 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
                 </Select>
               </TableCell>
               
-              {/* Combined Asset Class & Subclass */}
+              {/* Combined Asset Type/Class/Subclass */}
               <TableCell>
                 <Select
-                  value={row.assetClassId && row.assetSubclassId ? `${row.assetClassId}-${row.assetSubclassId}` : ''}
+                  value={row.assetClassId && row.assetSubclassId 
+                    ? `subclass-${row.assetClassId}-${row.assetSubclassId}` 
+                    : row.assetClassId 
+                      ? `class-${row.assetClassId}` 
+                      : ''}
                   onValueChange={(value) => handleAssetOptionChange(row.id, value)}
                   disabled={!row.safeguardId}
                 >
