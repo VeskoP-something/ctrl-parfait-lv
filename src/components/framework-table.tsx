@@ -25,6 +25,13 @@ interface FrameworkTableProps {
   onAttributeAdd: () => void;
 }
 
+interface AssetOption {
+  id: string;
+  displayName: string;
+  assetClassId: string;
+  assetSubclassId: string;
+}
+
 const FrameworkTable: React.FC<FrameworkTableProps> = ({
   tabType,
   attributes,
@@ -36,6 +43,7 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
 }) => {
   const [safeguards, setSafeguards] = useState<Safeguard[]>([]);
   const [assetSubclasses, setAssetSubclasses] = useState<AssetSubclass[]>([]);
+  const [assetOptions, setAssetOptions] = useState<Record<string, AssetOption[]>>({});
 
   // Extract all safeguards from control groups
   useEffect(() => {
@@ -58,6 +66,35 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
     setAssetSubclasses(allSubclasses);
   }, [controlGroups, assetClasses]);
 
+  // Generate asset options for each safeguard
+  useEffect(() => {
+    const options: Record<string, AssetOption[]> = {};
+
+    safeguards.forEach(safeguard => {
+      const safeguardOptions: AssetOption[] = [];
+      
+      // Add all applicable asset class + subclass combinations
+      assetClasses.forEach(assetClass => {
+        if (safeguard.applicable_asset_classes.includes(assetClass.id)) {
+          assetClass.subclasses.forEach(subclass => {
+            if (safeguard.applicable_asset_subclasses.includes(subclass.id)) {
+              safeguardOptions.push({
+                id: `${assetClass.id}-${subclass.id}`,
+                displayName: `${assetClass.name} > ${subclass.name}`,
+                assetClassId: assetClass.id,
+                assetSubclassId: subclass.id
+              });
+            }
+          });
+        }
+      });
+
+      options[safeguard.id] = safeguardOptions;
+    });
+
+    setAssetOptions(options);
+  }, [safeguards, assetClasses, assetSubclasses]);
+
   // Get all controls flattened
   const controls = controlGroups.flatMap(group => group.controls);
 
@@ -68,32 +105,6 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
 
   const getSafeguard = (safeguardId: string) => {
     return safeguards.find(safeguard => safeguard.id === safeguardId);
-  };
-
-  const getAssetClass = (assetClassId: string) => {
-    return assetClasses.find(assetClass => assetClass.id === assetClassId);
-  };
-
-  const getAssetSubclass = (assetSubclassId: string) => {
-    return assetSubclasses.find(subclass => subclass.id === assetSubclassId);
-  };
-
-  const getApplicableAssetClasses = (safeguardId: string) => {
-    const safeguard = getSafeguard(safeguardId);
-    if (!safeguard) return [];
-    return assetClasses.filter(assetClass => 
-      safeguard.applicable_asset_classes.includes(assetClass.id)
-    );
-  };
-
-  const getApplicableAssetSubclasses = (safeguardId: string, assetClassId: string) => {
-    const safeguard = getSafeguard(safeguardId);
-    if (!safeguard) return [];
-    
-    return assetSubclasses.filter(subclass => 
-      subclass.classId === assetClassId && 
-      safeguard.applicable_asset_subclasses.includes(subclass.id)
-    );
   };
 
   // Handle cell changes
@@ -113,7 +124,7 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
     onRowsChange(updatedRows);
   };
 
-  // Handle safeguard change - this needs to reset assetClass and assetSubclass
+  // Handle safeguard change - this needs to reset asset class/subclass
   const handleSafeguardChange = (rowId: string, safeguardId: string) => {
     const updatedRows = [...rows];
     const rowIndex = updatedRows.findIndex(r => r.id === rowId);
@@ -135,18 +146,19 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
     onRowsChange(updatedRows);
   };
 
-  // Handle asset class change - this needs to reset assetSubclass
-  const handleAssetClassChange = (rowId: string, assetClassId: string) => {
+  // Handle asset selection from the combined dropdown
+  const handleAssetOptionChange = (rowId: string, combinedValue: string) => {
     const updatedRows = [...rows];
     const rowIndex = updatedRows.findIndex(r => r.id === rowId);
     
-    if (rowIndex === -1) return;
+    if (rowIndex === -1 || !combinedValue) return;
     
-    // Update asset class, reset subclass
+    const [assetClassId, assetSubclassId] = combinedValue.split('-');
+    
     updatedRows[rowIndex] = {
       ...updatedRows[rowIndex],
       assetClassId,
-      assetSubclassId: ''
+      assetSubclassId
     };
     
     onRowsChange(updatedRows);
@@ -199,8 +211,7 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
             <TableHead className="w-[50px]">Actions</TableHead>
             <TableHead className="min-w-[180px]">Control</TableHead>
             <TableHead className="min-w-[180px]">Safeguard</TableHead>
-            <TableHead className="min-w-[180px]">Asset Class</TableHead>
-            <TableHead className="min-w-[180px]">Asset Subclass</TableHead>
+            <TableHead className="min-w-[180px]">Asset</TableHead>
             <TableHead className="min-w-[180px]">Enforcement Point</TableHead>
             {attributes.map(attribute => (
               <TableHead key={attribute.id} className="min-w-[150px]">
@@ -275,44 +286,22 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
                 </Select>
               </TableCell>
               
-              {/* Asset Class */}
+              {/* Combined Asset Class & Subclass */}
               <TableCell>
                 <Select
-                  value={row.assetClassId}
-                  onValueChange={(value) => handleAssetClassChange(row.id, value)}
+                  value={row.assetClassId && row.assetSubclassId ? `${row.assetClassId}-${row.assetSubclassId}` : ''}
+                  onValueChange={(value) => handleAssetOptionChange(row.id, value)}
                   disabled={!row.safeguardId}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select Asset Class" />
+                    <SelectValue placeholder="Select Asset" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
-                    {row.safeguardId && 
-                      getApplicableAssetClasses(row.safeguardId).map(assetClass => (
-                        <SelectItem key={assetClass.id} value={assetClass.id}>
-                          {assetClass.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              
-              {/* Asset Subclass */}
-              <TableCell>
-                <Select
-                  value={row.assetSubclassId}
-                  onValueChange={(value) => handleCellChange(row.id, 'assetSubclassId', value)}
-                  disabled={!row.assetClassId || !row.safeguardId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Asset Subclass" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {row.safeguardId && row.assetClassId && 
-                      getApplicableAssetSubclasses(row.safeguardId, row.assetClassId).map(subclass => (
-                        <SelectItem key={subclass.id} value={subclass.id}>
-                          {subclass.name}
-                        </SelectItem>
-                      ))}
+                    {row.safeguardId && assetOptions[row.safeguardId]?.map(option => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.displayName}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </TableCell>
@@ -345,7 +334,7 @@ const FrameworkTable: React.FC<FrameworkTableProps> = ({
           
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={7 + attributes.length} className="text-center">
+              <TableCell colSpan={6 + attributes.length} className="text-center">
                 No data available. Add a new row to get started.
               </TableCell>
             </TableRow>
